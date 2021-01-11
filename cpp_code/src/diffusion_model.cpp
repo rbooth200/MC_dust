@@ -7,6 +7,8 @@
 
 void DiffusionModel::solve_structure() {
 
+    solve_v_dust() ;
+
     // Setup coefficient matrix:
     std::vector<double> l(_num_cells), d(_num_cells), u(_num_cells) ;
 
@@ -21,8 +23,8 @@ void DiffusionModel::solve_structure() {
         double rho_l = _disc.density(zl) ;
         double rho_r = _disc.density(zr) ;
 
-        double vl = v_dust(zl) ;
-        double vr = v_dust(zr) ;
+        double vl = v_dust(i) ;
+        double vr = v_dust(i+1) ;
 
         double Dl = _disc.v_turb_sqd(zl) * _disc.t_eddy() ;
         double Dr = _disc.v_turb_sqd(zr) * _disc.t_eddy() ;
@@ -33,7 +35,7 @@ void DiffusionModel::solve_structure() {
 
         // Overwrite final cell, for which we have a special boundary condition
         if (i == _num_cells -1) {
-            d[i] = 0.5*vl ;
+            d[i] -= 0.5*vr ;
             u[i] = 0 ;
         }
     }
@@ -61,4 +63,77 @@ void DiffusionModel::solve_structure() {
     solver.factor_matrix(&(l[0]), &(d[0]), &(u[0])) ;
 
     solver.solve(&(rhs[0]), &(_rho[0])) ;
+}
+
+DiffusionModel::dust_sys 
+DiffusionModel::_get_dust_system(const std::vector<double>& v) {
+
+    DiscModel& disc = _disc ;
+    double drag = _drag_coeff ;
+    double dz = _dz ;
+    
+    auto t_stop = [&disc, drag, dz](int i) {
+        double z = dz*i ;
+        return drag / (disc.density(z) * disc.sound_speed(z));
+    } ;
+
+    auto v_sf = [&disc, &t_stop, &v,dz](int i) {
+        double z = dz*i ;
+        return v[i] - disc.v_z(z) - disc.gravity(z)*t_stop(i) ;
+    } ;
+
+    std::vector<double> 
+       l(_num_cells+1), d(_num_cells+1), u(_num_cells+1), f(_num_cells+1) ;
+
+    l[0] = 0 ;
+    d[0] = 1;
+    u[0] = 0 ;
+
+    f[0] = v_sf(0) ;
+
+    int i ;
+    double ts ;
+    for (i=1; i < _num_cells; i++) {
+        ts = t_stop(i) ;
+        l[i] = - v[i] * ts / (2*dz) ;
+        d[i] = (v[i+1] - v[i-1]) * ts / (2*dz) + 1;
+        u[i] = + v[i] * ts / (2*dz) ;
+
+        f[i] = v[i] * (v[i+1] - v[i-1]) * ts / (2*dz) + v_sf(i) ;
+    }
+
+    i = _num_cells ;
+    ts = t_stop(i) ;
+    l[i] = - v[i] * ts / dz ;  
+    d[i] = (2*v[i] - v[i-1]) * ts / dz + 1 ;
+    u[i] = 0 ;
+
+    f[i] = v[i] * (v[i] - v[i-1]) *ts / dz + v_sf(i) ;
+
+    return {f, l,d,u} ;
+}
+
+void DiffusionModel::solve_v_dust() {
+
+    // Setup coefficient matrix:
+    std::vector<double> f, l,d,u ;
+
+    // Initial guess for the velocity (short friction limit)
+    _vd.resize(_num_cells+1) ;
+    for (int i=0; i <= _num_cells; i++)
+        _vd[i] = v_dust_sf(ze(i)) ;
+
+    // Linear system solver for newton iteration
+    BlockTriDiagSolver<1> solver(_num_cells+1) ;
+
+    // Iterate
+    for (int iter=0; iter < 1000; iter++) {
+        std::tie(f,l,d,u) = _get_dust_system(_vd) ;
+
+        solver.factor_matrix(&(l[0]), &(d[0]), &(u[0])) ;
+        solver.solve(&f[0],&f[0]) ;
+
+        for (int i=0; i <= _num_cells; i++)
+            _vd[i] -= f[i] ;
+    }
 }

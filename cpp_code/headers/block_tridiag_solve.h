@@ -120,7 +120,7 @@ public:
 
       mat_t u_0(u + i * step, _block_size, _block_size);
 
-      x_0.noalias() = rhs_0 - _sLU[i].solve(u_0 * x_p);
+      x_0 = rhs_0 - _sLU[i].solve(u_0 * x_p);
     }
   }
 

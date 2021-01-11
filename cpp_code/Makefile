@@ -2,6 +2,7 @@
 HEADER_DIR=headers
 
 CPP = g++
+CUDA = nvcc
 CFLAGS = -O3 -Wall -Wextra -g -std=c++17 -march=native 
 INCLUDE = -I./$(HEADER_DIR) -I/usr/include/eigen3
 

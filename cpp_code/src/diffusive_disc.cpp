@@ -12,20 +12,30 @@ static Logger _logger;
 
 
 
-double find_input_velocity(double R, double z_IF) {
+double find_input_velocity(SoundSpeedProfile::params p_cs, DiscModel::params p,
+                           double v_target) {
+    double v0 = 0;
+    double v1 = v_target;
+    do {
+        double vc = 0.5 * (v0 + v1);
+        p.v_0 = vc;
+        double vf;
+        try {
+            DiscModel disc(SoundSpeedProfile(p_cs), p);
+            vf = disc.v_z(p_cs.z_t + 3 * p_cs.W);
+        } catch (std::exception&) {
+            // Velocity too high
+            v1 = vc;
+            continue;
+        }
+        if (vf >= v_target) v1 = vc;
+        if (vf <= v_target) v0 = vc;
 
-    // Compute the the ionization front height assuming:
-    //   - The sound speed in the ionized gas is 12.85 km/s
-    //   - The Mach number down-wind of the ionization front is 0.5
-    //   - The disc structure is Gaussian
+    } while ((v1 - v0) > 1e-12 * v1);
 
-    double cs_ratio = 12.85 / (29.8 * 0.05 * std::pow(R, -0.25)) ;
+    return 0.5 * (v0 + v1);
+}
 
-    double M_disc = std::exp(-0.5 * z_IF * z_IF) /
-        (cs_ratio*(1.25 + std::sqrt(25/16. - 1/(cs_ratio*cs_ratio)))) ;
-
-    return M_disc ;
-} ;
 
 DiscModel build_disc(double alpha = 0.05,
                      double z_IF = 3.5) {
@@ -36,23 +46,23 @@ DiscModel build_disc(double alpha = 0.05,
     double H_1 = (12.85 / 29.8) * std::pow(R, 0.5);
 
     SoundSpeedProfile::params pS;
-    pS.W = 0.05 ;
-    pS.z_t = 10 ;
+    pS.W = 0.001 ;
+    pS.z_t = z_IF ;
 
     pS.cs0 = 1.0;
-    pS.cs1 = 1.0;
+    pS.cs1 = H_1/H_mid ;
 
     DiscModel::params p;
     p.D_0 = alpha;
     p.D_1 = alpha;
-    p.z_t = 10 ;
+    p.z_t = pS.z_t ;
     p.W = 0.05;
 
     p.aspect = H_mid;
     p.gravity = DiscModel::GRAVITY::full;
 
-    p.Zmax = z_IF + 1;
-    p.v_0 = find_input_velocity(R, z_IF) ;
+    p.Zmax = 10 ;
+    p.v_0 = find_input_velocity(pS, p, 0.5*pS.cs1) ;
 
     DiscModel disc(SoundSpeedProfile(pS), p);
 
@@ -64,7 +74,7 @@ DiscModel build_disc(double alpha = 0.05,
 
     double fac = std::pow(1 + std::pow(z_IF * p.aspect, 2), 1.5);
     double St_mid = fac * p.v_0 / (p.Omega * p.z_t);
-    double St_crit = St_mid * p.rho_0 / disc.density(z_IF);
+    double St_crit = St_mid * p.rho_0 / disc.density(z_IF-3*pS.W);
     double St_IF = St_crit * pS.cs1 / pS.cs0;
     _logger << "Critical Stokes number  = " << St_mid << " (z=0), " << St_crit
             << " (z=z_t), " << St_IF << " (wind)"
@@ -91,7 +101,7 @@ std::tuple<double, double, double, int> parse_args(int argc, char* argv[]) {
     double St = 0;
     double alpha = 0.05;
     double z_IF = 3.5;
-    int num_cells = 10000 ;
+    int num_cells = 100000 ;
 
     bool keep_stdout = true;
 
@@ -135,7 +145,7 @@ void save_results(std::filesystem::path DIR_NAME,
         of << z << " " 
            << dust.density(i) << " "
            << disc.density(z) << " "
-           << dust.v_dust(z) << " "
+           << (dust.v_dust(i) + dust.v_dust(i+1))/2 << " "
            << disc.v_z(z) << "\n" ;
     }
 }
@@ -150,7 +160,7 @@ int main(int argc, char* argv[]) {
     std::filesystem::create_directories(BASE_DIR) ;
 
     DiscModel disc = build_disc(alpha, z_IF) ;
-    DiffusionModel dust(disc, St, z_IF, num_cells) ;
+    DiffusionModel dust(disc, St, 5, num_cells) ;
 
     save_results(BASE_DIR, disc, dust) ;
 } ;
