@@ -19,6 +19,7 @@ class HistogramCounts {
     HistogramCounts(Domain domain, int nbins)
      : counts(nbins), v(nbins), v_sqd(nbins), _domain(domain), _nbins(nbins){};
 
+    template<class Particles>
     void add_sample(Particles& p) {
         double z0 = _domain.left_edge,
                dz = (_domain.right_edge - _domain.left_edge) / _nbins;

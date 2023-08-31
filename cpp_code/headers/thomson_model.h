@@ -16,6 +16,7 @@ class BaseModel {
     void set_timestep_params(timestep_params p) { _p = p; }
     timestep_params get_timestep_params() const { return _p; }
 
+    template<class Particles>
     void set_timestep_levels(Particles& p, double time_step) const {
         double dt_max = _p.C_eddy * _disc.t_eddy();
 
@@ -61,7 +62,7 @@ class Thomson1986Model : public BaseModel {
     Thomson1986Model(double ts0, DiscModel disc)
      : BaseModel(ts0, disc){};
 
-    template <class RNG>
+    template <class RNG, class Particles>
     void take_step(Particles& p, double dt_max, RNG& rng) const {
         double t_e = _disc.t_eddy();
         std::normal_distribution<double> normal;
@@ -124,7 +125,7 @@ class Ormel2018Model : public BaseModel {
     Ormel2018Model(double ts0, DiscModel disc)
      : BaseModel(ts0, disc){};
 
-    template <class RNG>
+    template <class RNG, class Particles>
     void take_step(Particles& p, double dt_max, RNG& rng) const {
         double t_e = _disc.t_eddy();
         std::normal_distribution<double> normal;
@@ -176,7 +177,7 @@ class Laibe2020Model : public BaseModel {
     Laibe2020Model(double ts0, DiscModel disc)
      : BaseModel(ts0, disc){};
 
-    template <class RNG>
+    template <class RNG, class Particles>
     void take_step(Particles& p, double dt_max, RNG& rng) const {
         _drift(p, dt_max/2, rng) ;
         _kick(p, dt_max) ;
@@ -184,7 +185,7 @@ class Laibe2020Model : public BaseModel {
     }
 
    private:
-    template <class RNG>
+    template <class RNG, class Particles>
     void _drift(Particles& p, double dt_max, RNG& rng) const {
         double t_e = _disc.t_eddy();
         std::normal_distribution<double> normal;
@@ -212,7 +213,8 @@ class Laibe2020Model : public BaseModel {
             p.v_turb[i] = vt;
         }       
     }
-
+    
+    template<class Particles>
     void _kick(Particles& p, double dt_max) const {
         for (int i = 0; i < p.Nactive; i++) {
             double z = p.z[i], v = p.v[i], vt = p.v_turb[i];

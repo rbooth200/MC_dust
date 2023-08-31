@@ -16,7 +16,7 @@ class Ciesla2010Model {
     void set_timestep_params(timestep_params p) { _p = p; }
     timestep_params get_timeste_params() const { return _p; }
 
-    template <class RNG>
+    template <class RNG, class Particles>
     void take_step(Particles& p, double dt_max, RNG& rng) const {
         double t_e = _disc.t_eddy();
 
@@ -51,6 +51,7 @@ class Ciesla2010Model {
         }
     }
 
+    template<class Particles>
     void set_timestep_levels(Particles& p, double time_step) const {
         double dt_max = _p.C_Omega / _disc.disc_params().Omega;
 

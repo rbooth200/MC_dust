@@ -13,7 +13,7 @@
 
 class NoParticleInjection {
    public:
-    template <class RNG>
+    template <class RNG, class Particles>
     int operator()(Particles& /*p*/, double /*dt*/, RNG&) {
         return 0;
     }
@@ -24,7 +24,7 @@ class ConstantInjectionRate {
     ConstantInjectionRate(double Ndot, double z0, double v0, double v_turb)
      :  _Ndot(Ndot), _z0(z0), _v0(v0), _v_turb(v_turb), _N(0) {}
 
-    template <class RNG>
+    template <class RNG, class Particles>
     int operator()(Particles& p, double dt, RNG& rng) {
         _N += _Ndot * dt;
 
@@ -66,6 +66,7 @@ class Boundary {
     Boundary(Domain domain, TYPE left_boundary, TYPE right_boundary)
      : _domain(domain), _left(left_boundary), _right(right_boundary) {}
 
+    template<class Particles>
     bool operator()(Particles& p) {
         int size = p.size;
         bool dead_particles = false;
@@ -105,11 +106,13 @@ class Boundary {
     }
 
    private:
+    template<class Particles>
     void _reflect(Particles& p, int i, double z0) const {
         p.z[i] = 2 * z0 - p.z[i];
         p.v[i] *= -1;
         p.v_turb[i] *= -1;
     }
+    template<class Particles>
     void _outflow(Particles& p, int i) const {
         p.level[i] = Particles::flags::dead;
     }
@@ -137,6 +140,7 @@ class MonteCarloModel {
     MonteCarloModel(Method method, std::mt19937 rng = std::mt19937())
      : _rng(rng), _MCmethod(method){};
 
+    template<class Particles>
     void operator()(Particles& p, double tmax) {
         p.reset_time();
         _MCmethod.set_timestep_levels(p, tmax);  // Initialize the timesteps

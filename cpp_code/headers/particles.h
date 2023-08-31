@@ -11,6 +11,10 @@
 
 #include "utils.h"
 
+struct empty {} ;
+
+
+template <typename tracer_t = empty>
 class Particles {
    public:
     enum flags { dead = -1 };
@@ -91,11 +95,12 @@ class Particles {
         return level;
     }
 
-    void add_particle(double zi, double vi, double vt) {
+    void add_particle(double zi, double vi, double vt, tracer_t tr=tracer_t()) {
         z.push_back(zi);
         v.push_back(vi);
         v_turb.push_back(vt);
         time.push_back(current_integer_time);
+        tracers.push_back(tr);
 
         level.push_back(num_levels - 1);
         ++size;
@@ -149,6 +154,7 @@ class Particles {
             v_turb.resize(size);
             level.resize(size);
             time.resize(size);
+            tracers.resize(size);
 
             for (int i = 1; i < size; i++) {
                 assert(level[i - 1] >= level[i]);
@@ -157,6 +163,7 @@ class Particles {
         set_active_particles();
     }
 
+    // Note ASCII files do not support tracers
     void write_ASCII(double time, std::ostream& f) const {
         f.precision(16);
         f << "# Monte-Carlo Particle Snapshot, ASCII v1\n";
@@ -175,18 +182,24 @@ class Particles {
         auto write_int = [&f](int x) {
             f.write(reinterpret_cast<char*>(&x), sizeof(int));
         };
+        auto write_tracers = [&f](const tracer_t& x) {
+            f.write(reinterpret_cast<const char*>(&x), sizeof(tracer_t));
+        };
 
-        f << "# Monte-Carlo Particle Snapshot, binary v1\n";
+        f << "# Monte-Carlo Particle Snapshot, binary v2\n";
         write_double(time);
         write_int(size);
+        write_int(sizeof(tracer_t));
         for (int i = 0; i < size; i++) {
             write_double(z[i]);
             write_double(v[i]);
             write_double(v_turb[i]);
             write_int(level[i]);
+            write_tracers(tracers[i]);
         }
     }
 
+    // Note ASCII files do not support tracers
     double read_ASCII(std::istream& f) {
         std::string line;
         getline(f, line);
@@ -211,7 +224,7 @@ class Particles {
 
         getline(f, line);
         if (line != "# z v v_turb level")
-            throw std::invalid_argument("data types do not mathc");
+            throw std::invalid_argument("data types do not match");
 
         *this = Particles();
         do {
@@ -232,8 +245,11 @@ class Particles {
             ++size;
         } while (true);
 
+        tracers.resize(size);
+
         return sim_time;
     }
+
 
     double read_binary(std::istream& f) {
         auto read_double = [&f](double& x) {
@@ -242,31 +258,47 @@ class Particles {
         auto read_int = [&f](int& x) {
             f.read(reinterpret_cast<char*>(&x), sizeof(int));
         };
+        auto read_tracers = [&f](tracer_t& x) {
+            f.read(reinterpret_cast<char*>(&x), sizeof(tracer_t));
+        };
 
         std::string line;
         getline(f, line);
 
-        if (line != "# Monte-Carlo Particle Snapshot, binary v1")
+        bool v2 = false ;
+        if (line == "# Monte-Carlo Particle Snapshot, binary v2")
+            v2 = true ;
+        else if (line != "# Monte-Carlo Particle Snapshot, binary v1")
             throw std::invalid_argument(
                 "file is not a binary particle snapshot");
 
         *this = Particles();
 
+        int tracer_size;
         double sim_time;
         read_double(sim_time);
         read_int(size);
+
+        if (v2)
+            read_int(tracer_size);
+        if (tracer_size != sizeof(tracer_size))
+            throw std::invalid_argument(
+                "Trying to read simulation with tracers, but sizes do not match");
 
         z.resize(size);
         v.resize(size);
         v_turb.resize(size);
         level.resize(size);
         time.resize(size);
+        tracers.resize(size);
         for (int i = 0; i < size; i++) {
             read_double(z[i]);
             read_double(v[i]);
             read_double(v_turb[i]);
             read_int(level[i]);
             time[i] = current_integer_time;
+            if (v2)
+                read_tracers(tracers[i]);
         }
 
         return sim_time;
@@ -292,6 +324,7 @@ class Particles {
     std::vector<double> z, v, v_turb;
     std::vector<int> level;
     std::vector<uint64_t> time;
+    std::vector<tracer_t> tracers;
     int size = 0;
     int Nactive = 0;
 
@@ -302,6 +335,7 @@ class Particles {
         std::swap(v_turb[i], v_turb[j]);
         std::swap(level[i], level[j]);
         std::swap(time[i], time[j]);
+        std::swap(tracers[i], tracers[j]);
     }
 
     void sort_particles_by_level() {
