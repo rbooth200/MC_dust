@@ -146,8 +146,18 @@ class MonteCarloModel {
        _user_loop_method(user_loop_method){};
 
     MonteCarloModel(Method method, InjectionMethod injection,
+                    UserLoopMethod user_loop_method = UserLoopMethod(),
                     std::mt19937 rng = std::mt19937())
-     : _rng(rng), _MCmethod(method), _particle_injection(injection){};
+     : _rng(rng), 
+       _MCmethod(method), 
+       _particle_injection(injection),
+       _user_loop_method(user_loop_method){};
+
+    MonteCarloModel(Method method, UserLoopMethod user_loop_method,
+                    std::mt19937 rng = std::mt19937())
+     : _rng(rng), 
+       _MCmethod(method), 
+       _user_loop_method(user_loop_method){};
 
     MonteCarloModel(Method method, std::mt19937 rng = std::mt19937())
      : _rng(rng), _MCmethod(method){};
