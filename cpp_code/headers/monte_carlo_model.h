@@ -122,16 +122,28 @@ class Boundary {
     TYPE _right = TYPE::open;
 };
 
-template <class Method, class InjectionMethod = NoParticleInjection>
+class UserLoopMethod {
+   public:
+
+    template <class RNG, class Particles>
+    void operator()(Particles& /*p*/, double /*dt*/, RNG&) {
+    };
+} ;
+
+template <class Method, 
+          class InjectionMethod = NoParticleInjection, 
+          class UserLoopMethod = UserLoopMethod>
 class MonteCarloModel {
    public:
     MonteCarloModel(Method MCmethod, Boundary boundary,
                     InjectionMethod injection = InjectionMethod(),
+                    UserLoopMethod user_loop_method = UserLoopMethod(),
                     std::mt19937 rng = std::mt19937())
      : _rng(rng),
        _MCmethod(MCmethod),
        _boundary(boundary),
-       _particle_injection(injection){};
+       _particle_injection(injection),
+       _user_loop_method(user_loop_method){};
 
     MonteCarloModel(Method method, InjectionMethod injection,
                     std::mt19937 rng = std::mt19937())
@@ -157,6 +169,9 @@ class MonteCarloModel {
 
             _MCmethod.take_step(p, tmax, _rng);
 
+            // Apply user-supplied methods:
+            _user_loop_method(p, dt, _rng);
+
             // Apply boundary conditions and remove particles that
             // have left the domain.
             bool dead_particles = _boundary(p);
@@ -172,6 +187,7 @@ class MonteCarloModel {
     Method _MCmethod;
     Boundary _boundary;
     InjectionMethod _particle_injection;
+    UserLoopMethod _user_loop_method;
 };
 
 
