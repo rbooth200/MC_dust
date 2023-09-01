@@ -25,6 +25,9 @@ tar: ../MC_dust.tar
 	$(CPP) $(CFLAGS) $(INCLUDE) -c $<
 
 
+residence: src/residence.cpp $(HEADERS) Makefile 
+	$(CPP) $(CFLAGS) $(INCLUDE) $< -o $@
+
 front: src/front_model.cpp $(HEADERS) Makefile 
 	$(CPP) $(CFLAGS) $(INCLUDE) $< -o $@
 
@@ -44,7 +47,7 @@ tidy:
 	rm -rf discs.dat settling.dat output
 
 clean: 
-	rm -f *.o test_disc test_MC front
+	rm -f *.o test_disc test_MC front residence
 
 ../MC_dust.tar: $(ALL) Makefile
 	tar cvf $@ --exclude=.git --exclude=output --exclude=full_disc_sim --exclude=test_results *

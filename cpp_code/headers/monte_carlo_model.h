@@ -126,7 +126,7 @@ class UserLoopMethod {
    public:
 
     template <class RNG, class Particles>
-    void operator()(Particles& /*p*/, double /*dt*/, RNG&) {
+    void operator()(Particles& /*p*/, double /*tmax*/, RNG&) {
     };
 } ;
 
@@ -180,7 +180,7 @@ class MonteCarloModel {
             _MCmethod.take_step(p, tmax, _rng);
 
             // Apply user-supplied methods:
-            _user_loop_method(p, dt, _rng);
+            _user_loop_method(p, tmax, _rng);
 
             // Apply boundary conditions and remove particles that
             // have left the domain.
