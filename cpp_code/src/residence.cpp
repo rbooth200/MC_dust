@@ -108,7 +108,6 @@ DiscModel build_disc(double W = 0.001, double t_e = 1,
             << "Mid plane velocity      = " << p.v_0 << "\n"
             << "Downstream Mach number  = " << disc.v_z(z_f) / pS.cs1 << "\n"
             << "Mass-loss timescale     = " << disc.Sigma(p.z_t) / (p.rho_0*p.v_0) <<"\n";
-    _logger << p.rho_0 << " " << disc.Sigma(p.z_t) << "\n";
 
     double z_l = pS.z_t - 3 * p.W;
     double fac = std::pow(1 + std::pow(p.z_t * p.aspect, 2), 1.5);
@@ -167,10 +166,9 @@ std::tuple<double, double, double, double> parse_args(int argc, char* argv[]) {
     };
 
     if (argc > 1) St = parse_double(argv[1]);
-    if (argc > 2) W = parse_double(argv[2]);
-    if (argc > 3) t_e = parse_double(argv[3]);
-    if (argc > 4) t_loss = parse_double(argv[4]);
-    if (argc > 5) keep_stdout = parse_bool(argv[5]);
+    if (argc > 2) t_e = parse_double(argv[2]);
+    if (argc > 3) t_loss = parse_double(argv[3]);
+    if (argc > 4) keep_stdout = parse_bool(argv[4]);
 
     _logger = Logger(create_base_directory(St, W, t_e, t_loss) / "log.txt",
                      keep_stdout);
@@ -181,7 +179,7 @@ std::tuple<double, double, double, double> parse_args(int argc, char* argv[]) {
 
 class Tracers {
   public:
-    using value_t = std::array<double, 3> ;
+    using value_t = std::array<double, 4> ;
 
     Tracers(value_t vals = {0,0,0}) {
         for (int i = 0; i < size(); i++)
@@ -215,7 +213,8 @@ class TrackExposure {
         for (int i = 0; i < p.Nactive; i++) {
             double dt = p.get_level_timestep(tmax, p.level[i]);
 
-            for (int j = 0; j < _heights.size(); j++)
+            p.tracers[i][0] += dt ;
+            for (int j = 1; j < _heights.size(); j++)
                 p.tracers[i][j] += dt * (p.z[i] > _heights[j]) ;
         }
     };
@@ -248,7 +247,7 @@ int main(int argc, char* argv[]) {
     Boundary boundary({0, 5}, Boundary::TYPE::reflecting,
                       Boundary::TYPE::outflow);
 
-    Tracers Heights = Tracers::value_t{1.,2.,3.} ;
+    Tracers Heights = Tracers::value_t{0., 1.,2.,3.} ;
 
     Thomson1986Model<> thomson_method(St, disc);
     MonteCarloModel<Thomson1986Model<>, ConstantInjectionRate, TrackExposure> mc_model(
